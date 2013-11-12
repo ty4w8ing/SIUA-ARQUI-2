@@ -4,21 +4,24 @@
 ;;;;;;poner comentarios;
 ; Esto es para hacer el codigo mas legible
 
-sys_exit        equ     1
-sys_read        equ     3
-sys_write       equ     4
-sys_open		equ		5
-sys_close		equ 	6
-stdin           equ     0
-stdout          equ     1
+sys_exit equ 1
+sys_read equ 3
+sys_write equ 4
+sys_open equ 5
+sys_close equ 6
+stdin equ 0
+stdout equ 1
 
 ;seccion de datos no inicializados
 section .bss 	
-	comandoLen		equ		100; buffer que recibe el comando de usuario
-	comando		resb	comandoLen
+	comandoLen equ 100; buffer que recibe el comando de usuario
+	comando resb comandoLen
 	 
-	archivoLen equ 2000	;buffer que recibe el archivo a abrirse
+	archivoLen equ 190	;buffer que recibe el archivo a abrirse
 	archivo resb archivoLen
+	archivoLen2 equ 9999	;buffer que recibe el archivo a abrirse
+	archivo2 resb archivoLen2
+	
 		
 ;seccion de datos inicializados
 section .data
@@ -38,7 +41,7 @@ salirLen: equ $-salir
 mostrar: db "mostrar";texto para usar de comparación para el comando mostrar
 mostrarLen: equ $-mostrar
 
-archivoPin:	db "a.txt",0
+archivoPin:	db "a.txt"
 
 null: db 0
 ;seccion de codigo
@@ -58,8 +61,9 @@ _start:
 	mov edx, comandoLen;muevo al edx el largo del mensaje
 	mov ecx, comando; muevo al ecx el puntero del mensaje
 	call ReadText; llamo a la subrutina de leer de usuario
-	dec eax;decremento el eax que trae la cantidad de digitos leidos mas el ENTER
-	;push eax; salvo esa cantidad de dígitos en la pila
+	mov ecx, eax; muevo al ecx la cantidad de digitos leidos
+	dec ecx; decremento el ecx
+	mov byte[comando+ecx],0h;muevo al ultimo bit un null 
 	mov ecx, 0;muevo al ecx un cero que me servira de contador de digitos
 		   
 ;ciclo principal de la funcion	
@@ -74,27 +78,21 @@ cicloMostrar:
 	jmp     cicloMostrar; si no siga el ciclo
 ;muestra el archivo leido
 Show:
-	inc ecx ;incremeto el eax para seguir leyendo el comando
-	mov	dl, byte [comando + ecx]; muevo al dl el digito+ecx del archivo
-	cmp dl, 10; lo comparo con enter, para verificar que termino de escribir
-	je .sub2; brinco si es igual
-	mov byte[archivo+ecx], dl; si no lo meto en un buffer
-	jmp Show; y vuelvo al ciclo
+	mov ecx, 8; muevo al ecx un 8 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0; muevo un 0 al ebx que sirve de contador
+.sub:	
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 0h;comparo a ver si ya termine con null
+	je .sub2;si es null pase a analizar y abrir
+	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub;regreso al ciclo
 	
 .sub2:
-	inc ecx; incremento el ecx
-	mov byte[archivo+ecx], 0; y meto en el buffer un null
-	
-	;%%%%%%%%%%%      PRUEBA PARA VER QUE TIENE EL BUFFER %%%%%%%%%%%
-	mov edx, archivoLen
-	mov ecx, archivo
-	call DisplayText
-	;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	
-	;mov ebx, archivoPin ; ACA SI LO ABRE
-	
-	mov	ebx, archivo ; muevo al ebx el pintero del archivo (nombre.txt)
-	mov	ecx, 0	; cero para las FLAGS
+	mov eax, archivo; saco al eax el nombre del archivo
+	mov ebx, eax; lo paso al ebx
+	mov	ecx, 2; read and write mode
 	mov	eax,sys_open; llamada al sistema
 	int	80h		
 	push eax;salvo en la pila este FD
@@ -162,14 +160,14 @@ Muestra:
 	test	eax, eax ; primero nos aseguramos que abrio bien
 	js	mensajeError2; no es asi? imprime mensaje de errorLen
 	; si se abre bien
-	mov		ebx, eax; paso al ebx el FD
-	mov		ecx, archivo; paso el puntero del buffer con el archivo
-	mov		edx, archivoLen; y su len correspondiente
-	mov		eax, sys_read; y llamo a read de dicho archivo
-	int 	80h		
+	mov	ebx, eax; paso al ebx el FD
+	mov	ecx, archivo2; paso el puntero del buffer con el archivo
+	mov	edx, archivoLen2; y su len correspondiente
+	mov	eax, sys_read; y llamo a read de dicho archivo
+	int 80h		
 	;Una vez leido lo imprimo en consola por medio del DisplayText
-	mov edx, archivoLen
-	mov ecx, archivo 
+	mov edx, archivoLen2
+	mov ecx, archivo2
 	call DisplayText	
 	ret
 
