@@ -1,1 +1,0 @@
-Para el comando "mostrar" usted deberá digitar en la consola de la siguiente manera: "mostrar archivo.txt" . Esto le permitirá abrir un archivo que se encuentre en la misma carpeta que este proyecto. Notese que entre "mostrar" y "archivo.txt" va solamente un espacio y no hay espacios al final.
