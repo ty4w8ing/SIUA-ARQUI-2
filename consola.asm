@@ -14,13 +14,15 @@ stdout equ 1
 
 ;seccion de datos no inicializados
 section .bss 	
-	comandoLen equ 100; buffer que recibe el comando de usuario
+	comandoLen equ 30; buffer que recibe el comando de usuario
 	comando resb comandoLen
 	 
-	archivoLen equ 190	;buffer que recibe el archivo a abrirse
+	archivoLen equ 30	;buffer que recibe el nombre del archivo 
 	archivo resb archivoLen
-	archivoLen2 equ 9999	;buffer que recibe el archivo a abrirse
+	archivoLen2 equ 9999	;buffer que recibe el archivo 
 	archivo2 resb archivoLen2
+	archivoLen3 equ 9999	;buffer que recibe el archivo anexo
+	archivo3 resb archivoLen3
 	
 		
 ;seccion de datos inicializados
@@ -98,21 +100,21 @@ Show:
 	mov	dl, byte [archivo + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
 	cmp	dl, byte [ayuda + ecx]; comparo con lo mismo pero en el texto de comparacion
 	jne .sub4; si no son iguales pase al otro comando
-	inc		ecx		; si son iguales, incremento el ecx para pasar al otro digito
-	cmp		ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	inc	ecx		; si son iguales, incremento el ecx para pasar al otro digito
+	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
 	je mensajeAyudaMostrar; si son iguales valla mostrar mensaje de ayuda
 	jmp .sub3; si no siga el ciclo
 .sub4:	
 	mov eax, archivo; saco al eax el nombre del archivo
 	mov ebx, eax; lo paso al ebx
-	mov	ecx, 2; read and write mode
+	mov	ecx, 0; read  mode
 	mov	eax,sys_open; llamada al sistema
 	int	80h		
 	push eax;salvo en la pila este FD
 	call Muestra; llamo a la subrutina de mostrar
 	pop ebx	; saco de la pila ese FD
 	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
-	jmp _start; iniacia nuevamente el programa (parecido a un while true)
+	jmp Limpiar; brinco a limpiar los buffers
 	
 ;ciclo que revisa lo digitado por el usuario y si este digita salir, se sale del programa
 cicloSalir:
@@ -131,14 +133,59 @@ mensajeError:
 	mov ecx, msjError; muevo al ecx el puntero del mensaje
 	call DisplayText; llamo a la subrutina de mostrar en pantalla
 	
-	jmp _start ; si se imprime mensaje de error, inicie nuevamente el programa (parecido a un while true)
+	jmp Limpiar; brinco a limpiar los buffers
 	
 mensajeError2:
 	mov edx, errorLen2; muevo al edx el len del tamaño del mensaje de error
 	mov ecx, msjError2; muevo al ecx el puntero del mensaje
 	call DisplayText; llamo a la subrutina de mostrar en pantalla
+		
+	jmp Limpiar; brinco a limpiar los buffers
 	
-	jmp _start ; si se imprime mensaje de error, inicie nuevamente el programa (parecido a un while true)
+	
+;Funcion que limpia los buffers para volver a ser usados
+Limpiar:
+	xor edx, edx ;limpio el edx para usarlo como setter de stats
+	xor ecx, ecx; limpio el ecx para usarlo como contador
+;limpia comando
+.comando:
+	mov al, byte[comando+ecx]; muevo del bufer al al el byte actual
+	cmp al, dl;comparo con null
+	je .archivo; si no es null, es porque tiene basura. Brinque si no tiene basura
+	mov byte[comando+ecx], dl;muevo un null al buffer
+	inc ecx ;incremento el contador
+	jmp .comando;siga el ciclo
+;limpiar archivo
+.archivo:
+	xor ecx, ecx; limpio el ecx para usarlo como contador
+	.sub:
+	mov al, byte[archivo+ecx]; muevo del bufer al al el byte actual
+	cmp al, dl;comparo con null
+	je .archivo2; si no es null, es porque tiene basura. Brinque si no tiene basura
+	mov byte[archivo+ecx], dl;muevo un null al buffer
+	inc ecx;incremento el contador
+	jmp .sub;siga el ciclo
+;limpiar archivo2
+.archivo2:
+	xor ecx, ecx; limpio el ecx para usarlo como contador
+	.sub1:
+	mov al, byte[archivo2+ecx]; muevo del bufer al al el byte actual
+	cmp al, dl;comparo con null
+	je .archivo3; si no es null, es porque tiene basura. Brinque si no tiene basura
+	mov byte[archivo2+ecx], dl;muevo un null al buffer
+	inc ecx;incremento el contador
+	jmp .sub1;siga el ciclo
+;limpiar archivo3
+.archivo3: 
+	xor ecx, ecx; limpio el ecx para usarlo como contador
+	.sub2:
+	mov al, byte[archivo3+ecx]; muevo del bufer al al el byte actual
+	cmp al, dl;comparo con null
+	je _start ; si no es null, es porque tiene basura.Inicie nuevamente el programa (parecido a un while true) si esta limpio
+	mov byte[archivo3+ecx], dl;muevo un null al buffer
+	inc ecx;incremento el contador
+	jmp .sub2;siga el ciclo
+	
 ;fin del programa
 ; paso al eax 1 y ebx 0 y me salgo con la llamada al sistema
 Fin:
@@ -149,14 +196,14 @@ Fin:
 mensajeAyudaMostrar:
 	mov eax, ayudacomando; saco al eax el nombre del archivo
 	mov ebx, eax; lo paso al ebx
-	mov	ecx, 2; read and write mode
+	mov	ecx, 0; read and write mode
 	mov	eax,sys_open; llamada al sistema
 	int	80h		
 	push eax;salvo en la pila este FD
 	call Muestra; llamo a la subrutina de mostrar
 	pop ebx	; saco de la pila ese FD
 	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
-	jmp _start; iniacia nuevamente el programa (parecido a un while true)
+	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
 	
 	
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
