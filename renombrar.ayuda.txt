@@ -1,0 +1,1 @@
+Para el comando "renombrar" usted deberá digitar en la consola de la siguiente manera: "renombrar nombreActual nombreNuevo" . Esto le permitirá renombrar un archivo que se encuentre en la misma carpeta que este proyecto. Notese que entre "renombrar", "nombreActual" y nombreNuevo, va solamente un espacio y no hay espacios al final.
