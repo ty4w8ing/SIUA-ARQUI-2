@@ -41,9 +41,11 @@ salirLen: equ $-salir
 mostrar: db "mostrar";texto para usar de comparación para el comando mostrar
 mostrarLen: equ $-mostrar
 
-archivoPin:	db "a.txt"
+ayuda: db "--ayuda";texto para usar de comparación para el comando --ayuda
+ayudaLen: equ $-ayuda
 
-null: db 0
+ayudacomando: db "comando.ayuda.txt",0; comando para abrir ayuda en mostrar
+
 ;seccion de codigo
 section .text
 ; inicio del codigo del programa
@@ -90,6 +92,17 @@ Show:
 	jmp .sub;regreso al ciclo
 	
 .sub2:
+	mov eax, 7;cantidad de digitos maxima de --ayuda
+	mov ecx, 0; contador en cero
+.sub3:
+	mov	dl, byte [archivo + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub4; si no son iguales pase al otro comando
+	inc		ecx		; si son iguales, incremento el ecx para pasar al otro digito
+	cmp		ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaMostrar; si son iguales valla mostrar mensaje de ayuda
+	jmp .sub3; si no siga el ciclo
+.sub4:	
 	mov eax, archivo; saco al eax el nombre del archivo
 	mov ebx, eax; lo paso al ebx
 	mov	ecx, 2; read and write mode
@@ -132,6 +145,19 @@ Fin:
 	mov eax, sys_exit
 	mov ebx, 0
 	int 80h
+;funcion que imprime el mensaje de ayuda para comando ayuda
+mensajeAyudaMostrar:
+	mov eax, ayudacomando; saco al eax el nombre del archivo
+	mov ebx, eax; lo paso al ebx
+	mov	ecx, 2; read and write mode
+	mov	eax,sys_open; llamada al sistema
+	int	80h		
+	push eax;salvo en la pila este FD
+	call Muestra; llamo a la subrutina de mostrar
+	pop ebx	; saco de la pila ese FD
+	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
+	jmp _start; iniacia nuevamente el programa (parecido a un while true)
+	
 	
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
 ;rutinas intermedias...
