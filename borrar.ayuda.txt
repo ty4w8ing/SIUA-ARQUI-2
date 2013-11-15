@@ -1,0 +1,1 @@
+Para el comando "borrar" usted deberá digitar en la consola de la siguiente manera: "borrar nombreArchivo". Esto le permitirá borrar o eliminar un archivo que se encuentre en la misma carpeta que este proyecto. Notese que entre "borrar", "nombreArchivo", va solamente un espacio y no hay espacios al final.
