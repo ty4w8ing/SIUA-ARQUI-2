@@ -9,6 +9,8 @@ sys_read equ 3
 sys_write equ 4
 sys_open equ 5
 sys_close equ 6
+sys_link equ 9
+sys_unlink equ 10
 sys_rename equ 38
 stdin equ 0
 stdout equ 1
@@ -35,6 +37,18 @@ section .data
 msj: db "james@aguacate.console>>>  " ;mensaje de cabecera en consola
 len: equ $-msj
 
+msjExitoso: db "Copiado exitoso",10 ;mensaje de cabecera en consola
+lenex: equ $-msjExitoso
+
+msjExitosoB: db "Borrado exitoso",10 ;mensaje de cabecera en consola
+lenexB: equ $-msjExitosoB
+
+msjFallido: db "Copiado Fallido",10 ;mensaje de cabecera en consola
+lenfail: equ $-msjFallido
+
+msjFallidoB: db "Borrado Fallido",10 ;mensaje de cabecera en consola
+lenfailB: equ $-msjFallidoB
+
 msjError: db "No se reconoce el comando",10 ;mensaje de error en caso de que no se reconozca
 errorLen: equ $-msjError					;un comando
 
@@ -42,10 +56,12 @@ msjError2: db "No se pudo abrir el archivo",10 ;mensaje de error en caso de que 
 errorLen2: equ $-msjError2					;un archivo
 
 salir: db "salir";texto para usar de comparación para el comando salir
-salirLen: equ $-salir
 
 mostrar: db "mostrar";texto para usar de comparación para el comando mostrar
-mostrarLen: equ $-mostrar
+
+copiar: db "copiar"
+
+borrar: db "borrar"
 
 renombrar: db "renombrar";texto para usar de comparación para el comando renombrar
 renombrarLen: equ $-renombrar
@@ -55,9 +71,10 @@ ayudaLen: equ $-ayuda
 
 ayudamostrar: db "mostrar.ayuda.txt",0; comando para abrir ayuda en mostrar
 ayudarenombrar: db "renombrar.ayuda.txt",0; comando para abrir ayuda en mostrar
+ayudacopiar: db "copiar.ayuda.txt",0
+ayudaborrar: db "borrar.ayuda.txt",0
 
-a: db "a.txt",0
-james: db "james.txt",0
+
 ;seccion de codigo
 section .text
 ; inicio del codigo del programa
@@ -131,25 +148,39 @@ cicloRenombrar:
 	mov eax, 9; cantidad de digitos de renombrar
 	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
 	cmp	dl, byte [renombrar + ecx]; comparo con lo mismo pero en el texto de comparacion
-	jne cicloSalir; si no son iguales pase al otro comando
+	jne cicloCopiar; si no son iguales pase al otro comando
 	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
 	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
 	je Rename; si son iguales valla a mostrar el archivo
 	jmp .rsub; si no siga el ciclo
 	  
 Rename:
-	mov ecx, 10; muevo al ecx un 8 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov eax, 7;   
+	mov ecx, 10;muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0
+.ayuda:
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ebx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub_; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	inc ebx
+	cmp	ebx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaMostrar; si son iguales valla mostrar mensaje de ayuda
+	jmp .ayuda; si no siga el ciclo
+.sub_:
+	mov ecx, 10; muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
 	mov ebx, 0; muevo un 0 al ebx que sirve de contador
 .sub:	
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
-	cmp al, 20h;comparo a ver si ya termine con null
-	je .sub2;si es null pase a analizar y abrir
+	cmp al, 20h;comparo a ver si ya termine con espacio
+	je .sub2;si hay un espacio pase a analizar y abrir
 	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
 	jmp .sub;regreso al ciclo
 .sub2:
 	mov byte[archivo+ecx],0h; paso un null
+	xor ebx, ebx
 	inc ecx;paso del espacio al siguiente digito
 .sub3:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
@@ -160,27 +191,145 @@ Rename:
 	inc ebx
 	jmp .sub3;regreso al ciclo	
 .sub4:
-	mov eax, 7;cantidad de digitos maxima de --ayuda
+	mov byte[archivo2+ecx],0h; paso un null
+.sub5:	
+	mov eax, sys_rename;muevo la llamada 38 de rename
+	mov ebx, archivo ; muevo al ebx el primer parametro: nombre viejo
+	mov ecx, archivo2; muevo al ecx el segundo parametro: nombre nuevo
+	int 80h
+	cmp eax, 0
+	je  .copiadoExitoso
+	mov edx, lenfail
+	mov ecx, msjFallido
+	call DisplayText
+	jmp Limpiar
+	
+.copiadoExitoso:
+	mov edx, lenex
+	mov ecx, msjExitoso
+	call DisplayText
+	jmp Limpiar
+	
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cicloCopiar:
 	mov ecx, 0; contador en cero
-.sub5:
-	mov	dl, byte [archivo + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
-	cmp	dl, byte [ayuda + ecx]; comparo con lo mismo pero en el texto de comparacion
-	jne .sub6; si no son iguales pase al otro comando
+	.rsub:
+	mov eax, 6; cantidad de digitos de renombrar
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [copiar + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne cicloBorrar; si no son iguales pase al otro comando
 	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
 	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
-	je mensajeAyudaRename; si son iguales valla mostrar mensaje de ayuda
-	jmp .sub5; si no siga el ciclo
-.sub6:	
-	mov eax, archivo; saco al eax el nombre del archivo
-	mov ebx, eax; lo paso al ebx
-	mov	ecx, 2; read  mode
-	mov	eax,sys_open; llamada al sistema
-	int	80h		
-	push eax;salvo en la pila este FD
-	call Renombrando
-	pop eax
-	call Cerrar
+	je Copy; si son iguales valla a mostrar el archivo
+	jmp .rsub; si no siga el ciclo
+	  
+Copy:
+	mov eax, 7;   
+	mov ecx, 7;muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0
+.ayuda:
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ebx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub_; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	inc ebx
+	cmp	ebx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaCopy; si son iguales valla mostrar mensaje de ayuda
+	jmp .ayuda; si no siga el ciclo
+.sub_:
+	mov ecx, 7; muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0; muevo un 0 al ebx que sirve de contador
+.sub:	
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 20h;comparo a ver si ya termine con espacio
+	je .sub2;si hay un espacio pase a analizar y abrir
+	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub;regreso al ciclo
+.sub2:
+	mov byte[archivo+ecx],0h; paso un null
+	xor ebx, ebx
+	inc ecx;paso del espacio al siguiente digito
+.sub3:
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 0h;comparo a ver si ya termine con un espacio
+	je .sub4;si es null pase a analizar y abrir
+	mov byte[archivo2+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub3;regreso al ciclo	
+.sub4:
+	mov byte[archivo2+ecx],0h; paso un null
+.sub5:	
+	mov eax, sys_link;muevo la llamada 38 de rename
+	mov ebx, archivo ; muevo al ebx el primer parametro: nombre viejo
+	mov ecx, archivo2; muevo al ecx el segundo parametro: nombre nuevo
+	int 80h
+	cmp eax, 0
+	je  .copiadoExitoso
+	mov edx, lenfail
+	mov ecx, msjFallido
+	call DisplayText
+	jmp Limpiar
 	
+.copiadoExitoso:
+	mov edx, lenex
+	mov ecx, msjExitoso
+	call DisplayText
+	jmp Limpiar
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cicloBorrar:
+	mov eax, 6;cantidad de digitos maxima de mostrar
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [borrar + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne cicloSalir; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je Erase; si son iguales valla a mostrar el archivo
+	jmp cicloBorrar; si no siga el ciclo
+;muestra el archivo leido
+Erase:
+	mov ecx, 7; muevo al ecx un 8 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0; muevo un 0 al ebx que sirve de contador
+.sub:	
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 0h;comparo a ver si ya termine con null
+	je .sub2;si es null pase a analizar y abrir
+	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub;regreso al ciclo
+	
+.sub2:
+	mov eax, 7;cantidad de digitos maxima de --ayuda
+	mov ecx, 0; contador en cero
+.sub3:
+	mov	dl, byte [archivo + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub4; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaErase; si son iguales valla mostrar mensaje de ayuda
+	jmp .sub3; si no siga el ciclo
+.sub4:	
+	mov eax, sys_unlink
+	mov ebx, archivo
+	int 80h
+	cmp eax, 0
+	je  .BorradoExitoso
+	mov edx, lenfailB
+	mov ecx, msjFallidoB
+	call DisplayText
+	jmp Limpiar
+	
+.BorradoExitoso:
+	mov edx, lenexB
+	mov ecx, msjExitosoB
+	call DisplayText
+	jmp Limpiar
+	
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;ciclo que revisa lo digitado por el usuario y si este digita salir, se sale del programa
 cicloSalir:
 	mov eax, 5;cantidad de digitos maxima de salir
@@ -293,6 +442,30 @@ mensajeAyudaRename:
 	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
 	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
 	
+mensajeAyudaCopy:
+	mov eax, ayudacopiar; saco al eax el nombre del archivo
+	mov ebx, eax; lo paso al ebx
+	mov	ecx, 0; read mode
+	mov	eax,sys_open; llamada al sistema
+	int	80h		
+	push eax;salvo en la pila este FD
+	call Muestra; llamo a la subrutina de mostrar
+	pop ebx	; saco de la pila ese FD
+	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
+	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
+
+mensajeAyudaErase:
+	mov eax, ayudaborrar; saco al eax el nombre del archivo
+	mov ebx, eax; lo paso al ebx
+	mov	ecx, 0; read mode
+	mov	eax,sys_open; llamada al sistema
+	int	80h		
+	push eax;salvo en la pila este FD
+	call Muestra; llamo a la subrutina de mostrar
+	pop ebx	; saco de la pila ese FD
+	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
+	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
+	
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
 ;rutinas intermedias...
 
@@ -330,17 +503,6 @@ Muestra:
 	mov ecx, archivo2
 	call DisplayText	
 	ret
-;subrutina que renombra un archivo
-Renombrando:
-	test eax, eax ; primero nos aseguramos que abrio bien
-	js	mensajeError2; no es asi? imprime mensaje de errorLen
-	; si se abre bien
-	mov eax, sys_rename;muevo la llamada 38 de rename
-	mov ebx, archivo ; muevo al ebx el primer parametro: nombre viejo
-	mov ecx, archivo2 ; muevo al ecx el segundo parametro: nombre nuevo
-	int 80h
-	ret
-
 ;Subrutina que cierrra un archivo abierto
 Cerrar:
 	mov eax, sys_close; solamente se llama a la llamada del sistema sys_close
