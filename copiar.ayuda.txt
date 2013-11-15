@@ -1,0 +1,1 @@
+Para el comando "copiar" usted deberá digitar en la consola de la siguiente manera: "copiar nombreExistente nombreNuevo" . Esto le permitirá copiar y crear un archivo que se encuentre en la misma carpeta que este proyecto. Notese que entre "copiar", "nombreExistente" y nombreNuevo, va solamente un espacio y no hay espacios al final.
