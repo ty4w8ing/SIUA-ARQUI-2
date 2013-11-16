@@ -20,7 +20,7 @@ section .bss
 	comandoLen equ 100; buffer que recibe el comando de usuario
 	comando resb comandoLen
 	
-	comando2Len equ 100
+	comando2Len equ 15000
 	comando2 resb comando2Len
 	 
 	archivoLen equ 100	;buffer que recibe el nombre del archivo 
@@ -30,6 +30,11 @@ section .bss
 	archivoLen3 equ 15000	;buffer que recibe el archivo anexo
 	archivo3 resb archivoLen3
 	
+	cantidadDiferenciasLen equ 2
+	cantidadDiferencias resb cantidadDiferenciasLen
+	
+	buflen equ 25
+	buffer resb buflen
 		
 ;seccion de datos inicializados
 section .data
@@ -55,26 +60,34 @@ errorLen: equ $-msjError					;un comando
 msjError2: db "No se pudo abrir el archivo",10 ;mensaje de error en caso de que no abra
 errorLen2: equ $-msjError2					;un archivo
 
+;comandos para comprar
 salir: db "salir";texto para usar de comparación para el comando salir
-
 mostrar: db "mostrar";texto para usar de comparación para el comando mostrar
-
 copiar: db "copiar"
-
 borrar: db "borrar"
-
+comparar: db "comparar"
 renombrar: db "renombrar";texto para usar de comparación para el comando renombrar
-renombrarLen: equ $-renombrar
-
 ayuda: db "--ayuda";texto para usar de comparación para el comando --ayuda
-ayudaLen: equ $-ayuda
 
-ayudamostrar: db "mostrar.ayuda.txt",0; comando para abrir ayuda en mostrar
-ayudarenombrar: db "renombrar.ayuda.txt",0; comando para abrir ayuda en mostrar
+msjCompara: db "Diferencias en las siguientes lineas: "
+msjComparaLen: equ $-msjCompara
+
+msjNiuna: db "niuna",10
+msjNiunaLen: equ $-msjNiuna
+
+; comando para abrir ayuda
+ayudamostrar: db "mostrar.ayuda.txt",0
+ayudarenombrar: db "renombrar.ayuda.txt",0
 ayudacopiar: db "copiar.ayuda.txt",0
 ayudaborrar: db "borrar.ayuda.txt",0
+ayudacomparar: db "comparar.ayuda.txt",0
 
+enter: db 10
+enterLen: equ $-enter
 
+espacio: db 32
+espacioLen: equ $-espacio
+   
 ;seccion de codigo
 section .text
 ; inicio del codigo del programa
@@ -283,7 +296,7 @@ cicloBorrar:
 	mov eax, 6;cantidad de digitos maxima de mostrar
 	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
 	cmp	dl, byte [borrar + ecx]; comparo con lo mismo pero en el texto de comparacion
-	jne cicloSalir; si no son iguales pase al otro comando
+	jne cicloComparar; si no son iguales pase al otro comando
 	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
 	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
 	je Erase; si son iguales valla a mostrar el archivo
@@ -326,6 +339,162 @@ Erase:
 .BorradoExitoso:
 	mov edx, lenexB
 	mov ecx, msjExitosoB
+	call DisplayText
+	jmp Limpiar
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cicloComparar:
+	mov ecx, 0; contador en cero
+	.rsub:
+	mov eax, 8; cantidad de digitos de renombrar
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [comparar + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne cicloSalir; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je Equals; si son iguales valla a mostrar el archivo
+	jmp .rsub; si no siga el ciclo
+	  
+Equals:
+	mov eax, 7;   
+	mov ecx, 9;muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0
+.ayuda:
+	mov	dl, byte [comando + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ebx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub_; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	inc ebx
+	cmp	ebx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaCompare; si son iguales valla mostrar mensaje de ayuda
+	jmp .ayuda; si no siga el ciclo
+.sub_:
+	mov ecx, 9; muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
+	mov ebx, 0; muevo un 0 al ebx que sirve de contador
+.sub:	
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 20h;comparo a ver si ya termine con espacio
+	je .sub2;si hay un espacio pase a analizar y abrir
+	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub;regreso al ciclo
+.sub2:
+	mov byte[archivo+ecx],0h; paso un null
+	xor ebx, ebx
+	inc ecx;paso del espacio al siguiente digito
+.sub3:
+	mov al, byte[comando+ecx];muevo al al el byte actual del comando
+	cmp al, 0h;comparo a ver si ya termine con un espacio
+	je .sub4;si es null pase a analizar y abrir
+	mov byte[archivo2+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
+	inc ecx;incremento los contadores
+	inc ebx
+	jmp .sub3;regreso al ciclo	
+.sub4:
+	mov byte[archivo2+ecx],0h; paso un null
+.sub5:	
+;PRIMER ARCHIVO
+	mov eax, sys_open
+	mov ebx, archivo
+	mov ecx, 2
+	int 80h
+	push eax
+	test eax, eax ; primero nos aseguramos que abrio bien
+	js	mensajeError2; no es asi? imprime mensaje de errorLen
+	mov	ebx, eax; paso al ebx el FD
+	mov	ecx, comando2; paso el puntero del buffer con el archivo
+	mov	edx, comando2Len; y su len correspondiente
+	mov	eax, sys_read; y llamo a read de dicho archivo
+	int 80h		
+	pop ebx
+	call Cerrar
+;SEGUNDO ARCHIVO
+	mov eax, sys_open
+	mov ebx, archivo2
+	mov ecx, 2
+	int 80h
+	push eax
+	test eax, eax ; primero nos aseguramos que abrio bien
+	js	mensajeError2; no es asi? imprime mensaje de errorLen
+	mov	ebx, eax; paso al ebx el FD
+	mov	ecx, archivo3; paso el puntero del buffer con el archivo
+	mov	edx, archivoLen3; y su len correspondiente
+	mov	eax, sys_read; y llamo a read de dicho archivo
+	int 80h		
+	pop ebx
+	call Cerrar
+	
+	mov edx, msjComparaLen
+	mov ecx, msjCompara
+	call DisplayText
+
+
+	xor ecx, ecx;contador en cero
+	xor edx, edx;contador en cero
+	mov ebx, 1
+CicloComparador:
+	mov al, byte[comando2+ecx] 
+	cmp al, byte[archivo3+edx]
+	jne .avanzarLinea
+	inc ecx
+	inc edx
+	cmp al, 0h
+	je fin
+	cmp al, 10 ;enter
+	je .avanzarLineaP
+	jmp CicloComparador
+.avanzarLineaP:
+	inc bl
+	jmp CicloComparador
+.avanzarLinea:
+	push eax
+	push ecx
+	push edx
+	push ebx
+	
+	mov eax, ebx
+	lea esi,[cantidadDiferencias]
+	call int_to_string
+	
+	mov [cantidadDiferencias], eax
+	mov edx, cantidadDiferenciasLen
+	mov ecx, eax
+	call DisplayText
+	mov edx, espacioLen
+	mov ecx, espacio
+	call DisplayText
+	
+	pop ebx
+	pop edx
+	pop ecx
+	pop eax
+.sub1:
+	cmp al, 0h
+	je fin
+	cmp al, 10
+	je .sub2
+	inc ecx
+	mov al, byte[comando2+ecx]
+	jmp .sub1
+.sub2:
+	cmp byte[archivo3+edx], 0h
+	je fin
+	cmp byte[archivo3+edx], 10
+	je CicloComparador
+	inc edx
+	jmp .sub2
+fin:
+	pop ebx;limopiar pila
+	cmp byte[cantidadDiferencias], 0h
+	je .niuna
+	mov edx, enterLen
+	mov ecx, enter
+	call DisplayText
+	jmp Limpiar
+.niuna:
+	mov edx, msjNiunaLen
+	mov ecx, msjNiuna
 	call DisplayText
 	jmp Limpiar
 	
@@ -405,10 +574,20 @@ Limpiar:
 	.sub3:
 	mov al, byte[archivo3+ecx]; muevo del bufer al al el byte actual
 	cmp al, dl;comparo con null
-	je _start ; si no es null, es porque tiene basura.Inicie nuevamente el programa (parecido a un while true) si esta limpio
+	je .archivo5 ; si no es null, es porque tiene basura.Inicie nuevamente el programa (parecido a un while true) si esta limpio
 	mov byte[archivo3+ecx], dl;muevo un null al buffer
 	inc ecx;incremento el contador
 	jmp .sub3;siga el ciclo
+;limpiar archivo5
+.archivo5: 
+	xor ecx, ecx; limpio el ecx para usarlo como contador
+	.sub4:
+	mov al, byte[cantidadDiferencias+ecx]; muevo del bufer al al el byte actual
+	cmp al, dl;comparo con null
+	je _start ; si no es null, es porque tiene basura.Inicie nuevamente el programa (parecido a un while true) si esta limpio
+	mov byte[cantidadDiferencias+ecx], dl;muevo un null al buffer
+	inc ecx;incremento el contador
+	jmp .sub4;siga el ciclo
 
 	
 ;fin del programa
@@ -466,6 +645,18 @@ mensajeAyudaErase:
 	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
 	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
 	
+mensajeAyudaCompare:
+	mov eax, ayudacomparar; saco al eax el nombre del archivo
+	mov ebx, eax; lo paso al ebx
+	mov	ecx, 0; read mode
+	mov	eax,sys_open; llamada al sistema
+	int	80h		
+	push eax;salvo en la pila este FD
+	call Muestra; llamo a la subrutina de mostrar
+	pop ebx	; saco de la pila ese FD
+	call Cerrar ; llamo a cerrar el archivo para que no quede abierto
+	jmp Limpiar; brinco a limpiar los buffers; iniacia nuevamente el programa (parecido a un while true)
+	
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
 ;rutinas intermedias...
 
@@ -507,4 +698,22 @@ Muestra:
 Cerrar:
 	mov eax, sys_close; solamente se llama a la llamada del sistema sys_close
 	int 80h
+	ret
+
+;http://stackoverflow.com/questions/19309749/nasm-assembly-convert-input-to-integer
+int_to_string:
+	push esi
+	add esi,9
+	mov byte [esi],0
+	mov ebx,10         
+.next_digit:
+	xor edx,edx         ; Clear edx prior to dividing edx:eax by ebx
+	div ebx             ; eax /= 10
+	add dl,'0'          ; Convert the remainder to ASCII 
+	dec esi             ; store characters in reverse order
+	mov [esi],dl
+	test eax,eax            
+	jnz .next_digit     ; Repeat until eax==0
+	mov eax,esi
+	pop esi
 	ret
