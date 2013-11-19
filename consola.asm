@@ -63,6 +63,9 @@ errorLen: equ $-msjError					;un comando
 msjError2: db "No se pudo abrir el archivo",10 ;mensaje de error en caso de que no abra
 errorLen2: equ $-msjError2					;un archivo
 
+msjError3: db "Digite 2 variables para este comando",10;mensaje de error en caso de que solo de una variable (2 requeridas)
+errorLen3: equ $-msjError3
+
 handicap: db "Desea ejecutar este comando?(Y/N)",10
 handicapLen: equ $-handicap
 
@@ -198,11 +201,14 @@ Rename:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
 	cmp al, 20h;comparo a ver si ya termine con espacio
 	je .sub2;si hay un espacio pase a analizar y abrir
+	cmp al, 0h;me fijo a ver si es null el bit
+	je mensajeError3;si lo es hay un error al digitar ya que solo digito un nombre y no dos
 	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
 	jmp .sub;regreso al ciclo
 .sub2:
+
 	mov byte[archivo+ecx],0h; paso un null
 	xor ebx, ebx
 	inc ecx;paso del espacio al siguiente digito
@@ -287,6 +293,8 @@ Copy:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
 	cmp al, 20h;comparo a ver si ya termine con espacio
 	je .sub2;si hay un espacio pase a analizar y abrir
+	cmp al, 0h;me fijo a ver si es null el bit
+	je mensajeError3;si lo es hay un error al digitar ya que solo digito un nombre y no dos
 	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
@@ -436,6 +444,8 @@ Equals:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
 	cmp al, 20h;comparo a ver si ya termine con espacio
 	je .sub2;si hay un espacio pase a analizar y abrir
+	cmp al, 0h;me fijo a ver si es null el bit
+	je mensajeError3;si lo es hay un error al digitar ya que solo digito un nombre y no dos
 	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
@@ -585,6 +595,13 @@ mensajeError:
 mensajeError2:
 	mov edx, errorLen2; muevo al edx el len del tamaño del mensaje de error
 	mov ecx, msjError2; muevo al ecx el puntero del mensaje
+	call DisplayText; llamo a la subrutina de mostrar en pantalla
+
+	jmp Limpiar; brinco a limpiar los buffers
+	
+mensajeError3:
+	mov edx, errorLen3; muevo al edx el len del tamaño del mensaje de error
+	mov ecx, msjError3; muevo al ecx el puntero del mensaje
 	call DisplayText; llamo a la subrutina de mostrar en pantalla
 		
 	jmp Limpiar; brinco a limpiar los buffers
