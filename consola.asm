@@ -20,6 +20,9 @@ section .bss
 	comandoLen equ 100; buffer que recibe el comando de usuario
 	comando resb comandoLen
 	
+	forzarLen equ 32;
+	forzar resb forzarLen;
+	
 	comando2Len equ 15000
 	comando2 resb comando2Len
 	 
@@ -60,6 +63,9 @@ errorLen: equ $-msjError					;un comando
 msjError2: db "No se pudo abrir el archivo",10 ;mensaje de error en caso de que no abra
 errorLen2: equ $-msjError2					;un archivo
 
+handicap: db "Desea ejecutar este comando?(Y/N)",10
+handicapLen: equ $-handicap
+
 ;comandos para comprar
 salir: db "salir";texto para usar de comparación para el comando salir
 mostrar: db "mostrar";texto para usar de comparación para el comando mostrar
@@ -69,10 +75,14 @@ comparar: db "comparar"
 renombrar: db "renombrar";texto para usar de comparación para el comando renombrar
 ayuda: db "--ayuda";texto para usar de comparación para el comando --ayuda
 
+forzado: db "--forzado";texto para usar de comparación para el comando --forzado
+Y: db "Y"
+N: db "N"
+
 msjCompara: db "Diferencias en las siguientes lineas: "
 msjComparaLen: equ $-msjCompara
 
-msjNiuna: db "niuna",10
+msjNiuna: db "ninguna linea, son iguales",10
 msjNiunaLen: equ $-msjNiuna
 
 ; comando para abrir ayuda
@@ -180,6 +190,7 @@ Rename:
 	cmp	ebx, eax; comparo el contador con la cantidad de digitos maxima a comparar
 	je mensajeAyudaMostrar; si son iguales valla mostrar mensaje de ayuda
 	jmp .ayuda; si no siga el ciclo
+	
 .sub_:
 	mov ecx, 10; muevo al ecx un 10 que sirve de puntero a la siguiente texto, en este caso el nombre del archivo
 	mov ebx, 0; muevo un 0 al ebx que sirve de contador
@@ -199,13 +210,33 @@ Rename:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
 	cmp al, 0h;comparo a ver si ya termine con un espacio
 	je .sub4;si es null pase a analizar y abrir
+	cmp al, 20h
+	je .sub6
 	mov byte[archivo2+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
-	jmp .sub3;regreso al ciclo	
+	jmp .sub3;regreso al ciclo
+
+;#Forzado
 .sub4:
 	mov byte[archivo2+ecx],0h; paso un null
-.sub5:	
+.sub5:
+	call Handicap;Se llama al handicap subrutina encargada de preguntar si esta seguro del comando
+	mov eax, sys_rename;muevo la llamada 38 de rename
+	mov ebx, archivo ; muevo al ebx el primer parametro: nombre viejo
+	mov ecx, archivo2; muevo al ecx el segundo parametro: nombre nuevo
+	int 80h
+	cmp eax, 0
+	je  .copiadoExitoso
+	mov edx, lenfail
+	mov ecx, msjFallido
+	call DisplayText
+	jmp Limpiar
+
+;#Sin Forzado
+.sub6:
+	mov byte[archivo2+ecx],0h; paso un null
+.sub7:	
 	mov eax, sys_rename;muevo la llamada 38 de rename
 	mov ebx, archivo ; muevo al ebx el primer parametro: nombre viejo
 	mov ecx, archivo2; muevo al ecx el segundo parametro: nombre nuevo
@@ -309,6 +340,8 @@ Erase:
 	mov al, byte[comando+ecx];muevo al al el byte actual del comando
 	cmp al, 0h;comparo a ver si ya termine con null
 	je .sub2;si es null pase a analizar y abrir
+	cmp al, 20h
+	je .sub5
 	mov byte[archivo+ebx], al;si no es null, mueva el byte al buffer del nombre del archivo
 	inc ecx;incremento los contadores
 	inc ebx
@@ -325,7 +358,35 @@ Erase:
 	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
 	je mensajeAyudaErase; si son iguales valla mostrar mensaje de ayuda
 	jmp .sub3; si no siga el ciclo
+	
+;#Con Forzado	
 .sub4:	
+	call Handicap
+	mov eax, sys_unlink
+	mov ebx, archivo
+	int 80h
+	cmp eax, 0
+	je  .BorradoExitoso
+	mov edx, lenfailB
+	mov ecx, msjFallidoB
+	call DisplayText
+	jmp Limpiar
+	
+.sub5:
+	mov eax, 7;cantidad de digitos maxima de --ayuda
+	mov ecx, 0; contador en cero
+
+;# Sin forzado
+.sub6:
+	mov	dl, byte [archivo + ecx]; si es igual muevo al dl el byte numero ecx(contador) de lo digitado 
+	cmp	dl, byte [ayuda + ecx]; comparo con lo mismo pero en el texto de comparacion
+	jne .sub7; si no son iguales pase al otro comando
+	inc	ecx	; si son iguales, incremento el ecx para pasar al otro digito
+	cmp	ecx, eax; comparo el contador con la cantidad de digitos maxima a comparar
+	je mensajeAyudaErase; si son iguales valla mostrar mensaje de ayuda
+	jmp .sub6; si no siga el ciclo
+	
+.sub7:	
 	mov eax, sys_unlink
 	mov ebx, archivo
 	int 80h
@@ -424,7 +485,7 @@ Equals:
 	int 80h		
 	pop ebx
 	call Cerrar
-	
+	;imprimo a continuación la frase de comparar
 	mov edx, msjComparaLen
 	mov ecx, msjCompara
 	call DisplayText
@@ -432,71 +493,74 @@ Equals:
 
 	xor ecx, ecx;contador en cero
 	xor edx, edx;contador en cero
-	mov ebx, 1
+	mov ebx, 1;contador en uno... Simulando la linea actual del texto
 CicloComparador:
-	mov al, byte[comando2+ecx] 
-	cmp al, byte[archivo3+edx]
-	jne .avanzarLinea
-	inc ecx
+	mov al, byte[comando2+ecx] ;muevo al al el byte a comparar en el primer archivo
+	cmp al, byte[archivo3+edx] ;comparo AL con el byte a comparar en el segundo archivo
+	jne .avanzarLinea; si no son iguales hay que avanzar a la siguiente linea
+	inc ecx; si son iguales imcremento los contadores para avanzar al siguente bit
 	inc edx
-	cmp al, 0h
-	je fin
-	cmp al, 10 ;enter
-	je .avanzarLineaP
+	cmp al, 0h;si el bit que analizamos y sabemos q es igual en ambos archivos es null
+	je fin;brinco a fin
+	cmp al, 10 ;si el bit que analizamos y sabemos q es igual en ambos archivos es cambio de linea
+	je .avanzarLineaP;brinco a avanzar linea (bien)
 	jmp CicloComparador
 .avanzarLineaP:
-	inc bl
-	jmp CicloComparador
+	inc bl	;aca incremento el numero de linea
+	jmp CicloComparador; y sigo analizando
 .avanzarLinea:
-	push eax
+	push eax;salvo cada registro para no perderlo
 	push ecx
 	push edx
 	push ebx
 	
-	mov eax, ebx
-	lea esi,[cantidadDiferencias]
-	call int_to_string
-	
+	;Aca imprimo la linea actual del archivo. Solo entro aca si hay diferencias en algun archivo
+	mov eax, ebx;paso al eax el numero de linea actual
+	lea esi,[cantidadDiferencias];utilizo el esi para guardar el address del buffer
+	call int_to_string;llamo a la funcion que pasa de enteros a string
+	;imprimo el string de la linea actual
 	mov [cantidadDiferencias], eax
 	mov edx, cantidadDiferenciasLen
 	mov ecx, eax
 	call DisplayText
+	;imprimo un espacio en blanco (para no confundir 1 y 2 con 12)
 	mov edx, espacioLen
 	mov ecx, espacio
 	call DisplayText
-	
+	;retorno a cada registro los valores que tenian salvados previamente
 	pop ebx
 	pop edx
 	pop ecx
 	pop eax
-.sub1:
-	cmp al, 0h
-	je fin
-	cmp al, 10
-	je .sub2
-	inc ecx
-	mov al, byte[comando2+ecx]
-	jmp .sub1
+.sub1: ;subrutina que avanza el contador del primer archivo a la siguiente linea
+	cmp al, 0h;comparo el bit actual con null
+	je fin; si es igual salga
+	cmp al, 10;comparo cel bit actual con cambio de linea
+	je .sub2;si es igual ya avanzamos al final y pasamos al otro archivo
+	inc ecx;si no son iguales incremento el ecx
+	mov al, byte[comando2+ecx];muevo al al el siguiente bit
+	jmp .sub1;vovemos a comparar
 .sub2:
-	cmp byte[archivo3+edx], 0h
-	je fin
-	cmp byte[archivo3+edx], 10
-	je CicloComparador
-	inc edx
-	jmp .sub2
+	cmp byte[archivo3+edx], 0h;comparo el bit actual con null
+	je fin; si es igual salga
+	cmp byte[archivo3+edx], 10;comparo cel bit actual con cambio de linea
+	je CicloComparador;si es igual ya avanzamos al final y pasamos a analizar la siguiente linea
+	inc edx;paso al bit siguiente
+	jmp .sub2; volvemos a comparar
 fin:
-	pop ebx;limopiar pila
-	cmp byte[cantidadDiferencias], 0h
-	je .niuna
-	mov edx, enterLen
+	pop ebx;limpiar pila para q no de problemas
+	cmp byte[cantidadDiferencias], 0h;comparo a ver si se utilizo el buffer de diferencias con null
+	je .niuna; es es igual a null es porque no se uso, por consiguiente los archivos son iguales
+	mov edx, enterLen;imprimo un enter por estetica
 	mov ecx, enter
 	call DisplayText
 	jmp Limpiar
 .niuna:
+	;imprimo que son iguales
 	mov edx, msjNiunaLen
 	mov ecx, msjNiuna
 	call DisplayText
-	jmp Limpiar
+	jmp Limpiar;brincamos a limpiar los buffers
 	
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;ciclo que revisa lo digitado por el usuario y si este digita salir, se sale del programa
@@ -717,3 +781,26 @@ int_to_string:
 	mov eax,esi
 	pop esi
 	ret
+
+;subrutina que me pregunta si quiero hacer una accion
+Handicap:
+	mov edx,handicapLen
+	mov ecx,handicap
+	call DisplayText
+	;leo de usuario
+	mov edx,forzarLen
+	mov ecx,forzar
+	call ReadText
+	
+	mov al, byte[forzar]
+	cmp al, byte[Y];comparo lo que dice el usuaro (y/n)
+	je .sal; si es igual a Y salgo
+	mov al, byte[forzar]
+	cmp al, byte[N];comparo lo que dice el usuaro (y/n)
+	je Limpiar; si es igual a N no realizo la accion y voy a limpiar
+	jmp Handicap;ciclo que me indica q el usuario no puso Y o N
+.sal:
+	ret
+	
+
+
