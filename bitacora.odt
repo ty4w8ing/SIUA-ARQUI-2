@@ -1,0 +1,43 @@
+﻿							Bitacora 
+
+Domingo 10/11/2013
+
+Hoy comenzamos el proyecto, decidimos que el nombre en la linea de comandos sera jaime@guacate, la razon, ninguna este proyecto se presto para eso =D.
+Al inciar Mostrar fue rapido nos basamos en el codigo de verifica pin visto en clase guardando la informacion del archivo en un buffer, pero en vez de comparar y ya, lo imprimimos en pantalla, para esto usamos llamadas al sistema.
+Terminamos el comando salir el cual resulto ser el mas facil solo hacer sys_exit o.o
+y checar que estuviera bien escrito el comando esto lo hicimos guardando el comando en un buffer y compararlo con un mensaje, letra por letra si esta bien se realiza si no se dice que no se reconocio.
+
+
+lunes 11/11/2013
+
+Hoy se trato de avanzar en el proyecto en la parte de la funcion mostrar.
+Se logro meter en un buffer la segunda parte del comando, osea
+>>> mostar algo, se salva en el buffer "algo" pero se tiene un bug que no deja avanzar
+el cual a la hora de hacer open en el ebx no deja poner el buffer dando error. Se tiene un dato en 
+el .data con el nombre del buffer que si uso ese en ebx si fuciona. Extraño porq es lo mismo q esta en el buffer.
+
+Creando renombrar se encontro un bug, se arreglo de inmediato dandonos cuenta que el problema estaba en  que no se estaba limpiando de manera correcta el registro ebx dejando basuras(nulls) antes del nombre del archivo numero 2 como por ejemplo 00000b.txt
+Aparte a esto se logra dominar el uso de GIT y se manda al profesor el repositorio para que lo revise
+Se logro conseguir a la perfeccion los algorimos de renombrar y se desarrollo limpiar
+Ya sabemos como hacer copiar borrar y comparar(solo variar llamadas)
+
+martes 12/10/2013
+
+Hoy se logro termeniar copiar y borrar
+Comparar esta casi terminado el unico problema es que solo capta 9 diferencias, por lo que nos vimos forzados a implementar el itoa (int to to str), el cual logramos obtener de la pagina Stack Overflow haciendo unas modificaciones calzo en nuestro codigo.
+Ayuda y Forzado se implementaron, quedan bien  solo que no se logra reconoce en forzado si esta bien escrito. Apartir de aquí el trabajo esta practimente terminado.
+
+Sabado 16/11/2013
+
+Comparar: Para este comando se usó la misma lógica de Copiar, solo que en ves de 6 digitos como copiar, fueron 8. Una vez detectado la logica para ingresar los nombre de los archivos a los buffers, se abre cada uno de estos y se salvan en buffers deferentes mediante un read a cada file descriptor. Ya salvados, procedemos a salvar en ebx = 1. Esto indica el numero de linea. crecera cada iteracion Ecx y EDX = 0 ya que serán contadores.crecera cada iteracion Ahora revisamos digito por digito a ver si son iguales, si son igueles sigo comparando hasta que encontremos un enter, osea cambio de linea o un NULL en este caso el fin del archivo. Si es null me salgo del ciclo. Si no son iguales debo imprimir el ebx pasandolo por INT_TO_STR. Una vez impreso procedo a avanzar en cada buffer hasta la linea siguiente para ubicar ambos contadores en el primer digito de la siguiente linea, esto mediante comparaciones con ENTER(Ah). Si se encuentra un null es porque termina el archivo y por consiguiente el ciclo
+
+
+
+
+
+
+
+
+
+
+
